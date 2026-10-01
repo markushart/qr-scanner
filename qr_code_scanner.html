@@ -277,10 +277,10 @@
                 }
 
                 const config = { 
-                    fps: 15,
+                    fps: 30,
                     disableFlip: false,
                     qrbox: (viewfinderWidth, viewfinderHeight) => {
-                        let minEdgePercentage = 0.7; // 70% of the smallest edge
+                        let minEdgePercentage = 0.5; // Kleinere Box erzwingt mehr Abstand -> besserer Autofokus
                         let minEdgeSize = Math.min(viewfinderWidth, viewfinderHeight);
                         let qrboxSize = Math.floor(minEdgeSize * minEdgePercentage);
                         return { width: qrboxSize, height: qrboxSize };
