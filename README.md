@@ -13,6 +13,7 @@ A lightweight, modern, client-side QR code scanner web application built with HT
 - **🔁 Deduplication & Counter**: Tracks unique codes, avoids accidental duplicate registrations, and counts scanned items.
 - **🔗 Clickable URLs & Timestamping**: Automatically turns `http://` and `https://` results into clickable links with German-formatted timestamps.
 - **🔊 Visual & Audio Feedback**: Green pulse animation and synthesized audio chime (Web Audio API) on successful scans.
+- **💾 TXT Export**: Download a `.txt` file containing all scanned URLs/codes in one click.
 - **🗑️ History Management**: View recent scans or clear the scan list anytime.
 
 ---
