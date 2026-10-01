@@ -61,7 +61,7 @@
                 </div>
                 
                 <select id="camera-select" class="hidden text-sm bg-slate-50 border border-slate-200 rounded-lg p-2 text-slate-700 w-full mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <option value="">Standard-Kamera (Automatisch)</option>
+                    <option value="">Standard-Kamera (Innenkamera)</option>
                 </select>
 
                 <!-- Placeholder / Scanner Container -->
@@ -159,23 +159,40 @@
                 verbose: false
             });
 
-            // Vorab verfügbare Kameras auflisten
-            Html5Qrcode.getCameras().then(devices => {
-                if (devices && devices.length > 0) {
-                    cameraSelect.innerHTML = '';
-                    devices.forEach((device, index) => {
-                        const opt = document.createElement('option');
-                        opt.value = device.id;
-                        opt.textContent = device.label || `Kamera ${index + 1}`;
-                        cameraSelect.appendChild(opt);
-                    });
-                    if (devices.length > 1) {
-                        cameraSelect.classList.remove('hidden');
+            // Hilfsfunktion: Kameras auflisten und Innenkamera (Front) bevorzugen
+            const populateCameraList = (devices) => {
+                if (!devices || devices.length === 0) return;
+                
+                const currentVal = cameraSelect.value;
+                cameraSelect.innerHTML = '<option value="">Standard-Kamera (Innenkamera)</option>';
+                
+                let frontCameraId = null;
+                devices.forEach((device, index) => {
+                    const opt = document.createElement('option');
+                    opt.value = device.id;
+                    const label = device.label || `Kamera ${index + 1}`;
+                    opt.textContent = label;
+                    
+                    const l = label.toLowerCase();
+                    if (!frontCameraId && (l.includes('front') || l.includes('user') || l.includes('vorder') || l.includes('innen') || l.includes('selfie') || l.includes('face'))) {
+                        frontCameraId = device.id;
                     }
+                    cameraSelect.appendChild(opt);
+                });
+
+                if (currentVal && Array.from(cameraSelect.options).some(o => o.value === currentVal)) {
+                    cameraSelect.value = currentVal;
+                } else if (frontCameraId) {
+                    cameraSelect.value = frontCameraId;
                 }
-            }).catch(() => {
-                // Berechtigung noch nicht erteilt; wird nach erstem Start erneut versucht
-            });
+
+                if (devices.length > 1) {
+                    cameraSelect.classList.remove('hidden');
+                }
+            };
+
+            // Vorab verfügbare Kameras auflisten
+            Html5Qrcode.getCameras().then(populateCameraList).catch(() => {});
 
             // --- Feedback Functions ---
             const showFeedback = (message, type = "info") => {
@@ -301,7 +318,8 @@
                 };
                 
                 const selectedCameraId = cameraSelect.value;
-                const cameraConfig = selectedCameraId ? selectedCameraId : { facingMode: { ideal: "environment" } };
+                // Standardmäßig Innenkamera (Front) anfordern
+                const cameraConfig = selectedCameraId ? selectedCameraId : { facingMode: "user" };
 
                 try {
                     await html5QrCode.start(cameraConfig, config, onScanSuccess);
@@ -312,20 +330,7 @@
                     showFeedback("Kamera aktiv – halte QR-Code ins Bild", "info");
 
                     // Gerätenamen nach Erlaubnis aktualisieren
-                    Html5Qrcode.getCameras().then(devices => {
-                        if (devices && devices.length > 1) {
-                            const currentVal = cameraSelect.value;
-                            cameraSelect.innerHTML = '';
-                            devices.forEach((device, index) => {
-                                const opt = document.createElement('option');
-                                opt.value = device.id;
-                                opt.textContent = device.label || `Kamera ${index + 1}`;
-                                if (device.id === currentVal) opt.selected = true;
-                                cameraSelect.appendChild(opt);
-                            });
-                            cameraSelect.classList.remove('hidden');
-                        }
-                    }).catch(() => {});
+                    Html5Qrcode.getCameras().then(populateCameraList).catch(() => {});
                 } catch (err) {
                     console.error("Fehler beim Starten des Scanners: ", err);
                     alert("Kamera konnte nicht gestartet werden. Bitte überprüfe die Berechtigungen.");
