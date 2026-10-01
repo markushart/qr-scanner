@@ -80,6 +80,12 @@
                     <button id="btn-start" class="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg shadow-sm transition-colors w-full sm:w-auto">
                         Scanner starten
                     </button>
+                    <button id="btn-switch" class="hidden px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-lg shadow-sm transition-colors flex items-center justify-center gap-2 w-full sm:w-auto">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                        <span id="btn-switch-text">Kamera wechseln</span>
+                    </button>
                     <button id="btn-stop" class="hidden px-6 py-2.5 bg-red-100 hover:bg-red-200 text-red-700 font-medium rounded-lg shadow-sm transition-colors w-full sm:w-auto">
                         Stoppen
                     </button>
@@ -136,10 +142,13 @@
             let html5QrCode = null;
             let isScanning = false;
             let toastTimeout = null;
+            let currentFacingMode = "user"; // Standardmäßig Innenkamera (Front)
 
             // --- DOM Elements ---
             const btnStart = document.getElementById('btn-start');
             const btnStop = document.getElementById('btn-stop');
+            const btnSwitch = document.getElementById('btn-switch');
+            const btnSwitchText = document.getElementById('btn-switch-text');
             const btnClear = document.getElementById('btn-clear');
             const btnExport = document.getElementById('btn-export');
             const listContainer = document.getElementById('scanned-list');
@@ -317,9 +326,8 @@
                     disableFlip: false
                 };
                 
-                const selectedCameraId = cameraSelect.value;
-                // Standardmäßig Innenkamera (Front) anfordern
-                const cameraConfig = selectedCameraId ? selectedCameraId : { facingMode: "user" };
+                // Bevorzuge facingMode für zuverlässigen Wechsel ohne deviceId-Rechtefehler auf iOS
+                const cameraConfig = { facingMode: currentFacingMode };
 
                 try {
                     await html5QrCode.start(cameraConfig, config, onScanSuccess);
@@ -327,13 +335,16 @@
                     placeholder.style.display = 'none';
                     btnStart.classList.add('hidden');
                     btnStop.classList.remove('hidden');
-                    showFeedback("Kamera aktiv – halte QR-Code ins Bild", "info");
-
-                    // Gerätenamen nach Erlaubnis aktualisieren
-                    Html5Qrcode.getCameras().then(populateCameraList).catch(() => {});
+                    btnSwitch.classList.remove('hidden');
+                    updateSwitchButtonLabel();
+                    showFeedback(`Kamera aktiv (${currentFacingMode === 'user' ? 'Innenkamera' : 'Außenkamera'})`, "info");
                 } catch (err) {
                     console.error("Fehler beim Starten des Scanners: ", err);
-                    alert("Kamera konnte nicht gestartet werden. Bitte überprüfe die Berechtigungen.");
+                    if (err.name === 'NotAllowedError' || (err.message && err.message.toLowerCase().includes('permission'))) {
+                        alert("⚠️ Kamerazugriff in Safari blockiert!\n\nSo hebst du die Blockierung in Safari auf:\n1. Tippe in der Safari-Adressleiste links auf das 'AA' (oder Schloss/Schieberegler-Symbol).\n2. Wähle 'Website-Einstellungen'.\n3. Setze 'Kamera' auf 'Erlauben'.\n4. Lade die Seite neu.");
+                    } else {
+                        alert("Kamera konnte nicht gestartet werden: " + (err.message || err));
+                    }
                 }
             };
 
@@ -349,6 +360,7 @@
                         placeholder.style.display = 'flex';
                         btnStart.classList.remove('hidden');
                         btnStop.classList.add('hidden');
+                        btnSwitch.classList.add('hidden');
                         showFeedback("", "info");
                     }
                 }
@@ -410,17 +422,41 @@
                 }
             });
 
+            // Kamera umschalten (Innenkamera <-> Außenkamera)
+            const switchCamera = async () => {
+                btnSwitch.disabled = true;
+                showFeedback("Wechsle Kamera...", "info");
+                
+                // Toggle front / back
+                currentFacingMode = (currentFacingMode === "user" ? "environment" : "user");
+                
+                try {
+                    if (isScanning && html5QrCode) {
+                        await html5QrCode.stop();
+                        isScanning = false;
+                        // Kurze Pause für iOS, damit die Kamera-Hardware freigegeben wird
+                        await new Promise(r => setTimeout(r, 250));
+                    }
+                    await startScanner();
+                } catch (err) {
+                    console.error("Fehler beim Kamerawechsel: ", err);
+                } finally {
+                    btnSwitch.disabled = false;
+                }
+            };
+
+            const updateSwitchButtonLabel = () => {
+                if (btnSwitchText) {
+                    btnSwitchText.textContent = currentFacingMode === "user" ? "Zu Außenkamera" : "Zu Innenkamera";
+                }
+            };
+
             // --- Event Listeners ---
             btnStart.addEventListener('click', startScanner);
             btnStop.addEventListener('click', stopScanner);
+            btnSwitch.addEventListener('click', switchCamera);
             btnClear.addEventListener('click', clearList);
             btnExport.addEventListener('click', exportTxt);
-            cameraSelect.addEventListener('change', async () => {
-                if (isScanning) {
-                    await stopScanner();
-                    await startScanner();
-                }
-            });
         });
     </script>
     
